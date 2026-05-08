@@ -1,0 +1,81 @@
+{% extends 'scanner/base.html' %}
+{% block title %}Records — TrackGuard{% endblock %}
+
+{% block content %}
+<h1>Scan Records</h1>
+<p class="subtitle">Search, filter and export all scanned packages</p>
+
+<div class="card">
+  <form method="GET" style="display: grid; grid-template-columns: 1fr auto auto auto; gap: 0.75rem; align-items: end;">
+    <div class="form-group" style="margin:0">
+      <label>Search</label>
+      <input type="text" name="q" value="{{ q }}" placeholder="Tracking ID, Order ID, notes...">
+    </div>
+    <div class="form-group" style="margin:0">
+      <label>From Date</label>
+      <input type="date" name="from" value="{{ date_from }}">
+    </div>
+    <div class="form-group" style="margin:0">
+      <label>To Date</label>
+      <input type="date" name="to" value="{{ date_to }}">
+    </div>
+    <button type="submit" class="btn btn-primary">Search</button>
+  </form>
+</div>
+
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+  <span style="font-size:0.8rem; color:var(--muted);">
+    {{ scans.count }} record{{ scans.count|pluralize }} found
+  </span>
+  <a href="/export/?q={{ q }}&from={{ date_from }}&to={{ date_to }}" class="btn btn-ghost" style="font-size:0.8rem;">⬇ Export CSV</a>
+</div>
+
+<div class="card" style="padding:0; overflow:hidden;">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Tracking ID</th>
+        <th>Order ID</th>
+        <th>Driver Name</th>
+        <th>Courier</th>
+        <th>Timestamp (IST)</th>
+        <th>Notes</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for scan in scans %}
+      <tr>
+        <td style="color:var(--muted);font-family:var(--mono);font-size:0.75rem;">{{ scan.id }}</td>
+        <td><span class="tracking-id">{{ scan.tracking_id }}</span></td>
+        <td style="color:var(--muted);">{{ scan.order_id|default:"—" }}</td>
+        <td style="color:var(--muted);">{{ scan.driver_name|default:"—" }}</td>
+        <td>
+          {% if scan.courier %}
+          <span class="badge {% if scan.courier == 'amazon' %}badge-amazon{% else %}badge-default{% endif %}">{{ scan.get_courier_display }}</span>
+          {% else %}<span style="color:var(--muted);">—</span>{% endif %}
+        </td>
+        <td style="font-family:var(--mono);font-size:0.78rem;">
+          <span style="color:var(--text);">{{ scan.scanned_at|date:"d M Y" }}</span>
+          <span style="color:var(--accent);"> {{ scan.scanned_at|date:"H:i:s" }}</span>
+        </td>
+        <td style="color:var(--muted);font-size:0.8rem;max-width:200px;">{{ scan.notes|default:"—" }}</td>
+        <td>
+          <form method="POST" action="/delete/{{ scan.id }}/" onsubmit="return confirm('Delete this record?')">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">✕</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="8" style="text-align:center;color:var(--muted);padding:3rem;">
+          No records found{% if q %} for "{{ q }}"{% endif %}.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

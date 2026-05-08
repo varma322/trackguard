@@ -1,0 +1,197 @@
+{% extends 'scanner/base.html' %}
+{% block title %}Scanner — TrackGuard{% endblock %}
+
+{% block content %}
+<h1>Package Scanner</h1>
+<p class="subtitle">Point USB barcode scanner at package — auto-submits on scan</p>
+
+<div class="card" style="border-color: rgba(0,229,160,0.3); background: linear-gradient(135deg, #0d1a15 0%, var(--surface) 100%);">
+  <div class="form-group">
+    <label>▷ Tracking ID / Barcode</label>
+    <input
+      type="text"
+      id="tracking-input"
+      placeholder="Ready for scan..."
+      autocomplete="off"
+      style="font-family: var(--mono); font-size: 1.4rem; padding: 1rem 1.2rem; border-color: rgba(0,229,160,0.4); letter-spacing: 0.05em;"
+    >
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+    <div class="form-group" style="margin:0">
+      <label>Order ID (optional)</label>
+      <input type="text" id="order-id" placeholder="e.g. 403-123456">
+    </div>
+    <div class="form-group" style="margin:0">
+      <label>Driver Name (optional)</label>
+      <input type="text" id="driver-name" placeholder="e.g. joseph">
+    </div>
+    <div class="form-group" style="margin:0">
+      <label>Courier</label>
+      <select id="courier">
+        <option value="amazon">Amazon</option>
+        <option value="delhivery">Delhivery</option>
+        <option value="ekart">Ekart</option>
+        <option value="bluedart">Blue Dart</option>
+        <option value="xpressbees">Xpressbees</option>
+        <option value="dtdc">DTDC</option>
+        <option value="shadowfax">Shadowfax</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin:0">
+      <label>Notes</label>
+      <select id="notes">
+        <option value="Good condition">Good condition</option>
+        <option value="Damage">Damage</option>
+      </select>
+    </div>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 1rem;">
+    <button class="btn btn-primary" onclick="submitScan()">⚡ Save Scan</button>
+    <span style="color: var(--muted); font-size: 0.8rem;">or just press Enter after scan</span>
+    <div id="status-dot" style="margin-left:auto; display:flex; align-items:center; gap:0.5rem;">
+      <span style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;box-shadow:0 0 6px var(--accent);"></span>
+      <span style="font-size:0.75rem;color:var(--muted);font-family:var(--mono);">READY</span>
+    </div>
+  </div>
+</div>
+
+<!-- Live feed -->
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+  <h2 style="font-family: var(--mono); font-size: 0.9rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase;">Recent Scans</h2>
+  <a href="/records/" style="font-size:0.8rem; color:var(--accent); text-decoration:none;">View all →</a>
+</div>
+
+<div class="card" style="padding:0; overflow:hidden;">
+  <table id="recent-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Tracking ID</th>
+        <th>Order ID</th>
+        <th>Driver Name</th>
+        <th>Courier</th>
+        <th>Timestamp (IST)</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody id="recent-body">
+      {% for scan in recent %}
+      <tr>
+        <td style="color:var(--muted);font-family:var(--mono);font-size:0.75rem;">{{ scan.id }}</td>
+        <td><span class="tracking-id">{{ scan.tracking_id }}</span></td>
+        <td style="color:var(--muted);">{{ scan.order_id|default:"—" }}</td>
+        <td style="color:var(--muted);">{{ scan.driver_name|default:"—" }}</td>
+        <td>
+          {% if scan.courier %}
+          <span class="badge {% if scan.courier == 'amazon' %}badge-amazon{% else %}badge-default{% endif %}">{{ scan.get_courier_display }}</span>
+          {% else %}<span style="color:var(--muted);">—</span>{% endif %}
+        </td>
+        <td style="font-family:var(--mono);font-size:0.78rem;color:var(--muted);">{{ scan.scanned_at|date:"d M Y, H:i:s" }}</td>
+        <td style="color:var(--muted);font-size:0.8rem;">{{ scan.notes|default:"—" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:3rem;">No scans yet. Waiting for first scan...</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const input = document.getElementById('tracking-input');
+input.focus();
+
+// Re-focus whenever focus is lost (scanner may briefly lose focus)
+document.addEventListener('click', () => input.focus());
+
+input.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    submitScan();
+  }
+});
+
+async function submitScan() {
+  const tracking_id = input.value.trim();
+  if (!tracking_id) return;
+
+  const payload = {
+    tracking_id,
+    order_id: document.getElementById('order-id').value.trim(),
+    driver_name: document.getElementById('driver-name').value.trim(),
+    courier: document.getElementById('courier').value,
+    notes: document.getElementById('notes').value.trim(),
+  };
+
+  try {
+    const res = await fetch('/scan/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (data.id) {
+      showToast(`${data.tracking_id} — ${data.scanned_at}`);
+      addRow(data, payload);
+      input.value = '';
+      document.getElementById('notes').value = '';
+      input.focus();
+      flashInput();
+    }
+  } catch(err) {
+    console.error(err);
+  }
+}
+
+function flashInput() {
+  input.style.borderColor = 'var(--accent)';
+  input.style.boxShadow = '0 0 0 3px rgba(0,229,160,0.2)';
+  setTimeout(() => {
+    input.style.borderColor = '';
+    input.style.boxShadow = '';
+  }, 600);
+}
+
+function addRow(data, payload) {
+  const tbody = document.getElementById('recent-body');
+  // Remove "no scans" row if present
+  if (tbody.querySelector('td[colspan]')) tbody.innerHTML = '';
+
+  const courierLabel = document.getElementById('courier');
+  const courierText = courierLabel.options[courierLabel.selectedIndex].text;
+
+  const badgeClass = payload.courier === 'amazon' ? 'badge-amazon' : 'badge-default';
+  const badgeHtml = payload.courier
+    ? `<span class="badge ${badgeClass}">${courierText}</span>`
+    : '<span style="color:var(--muted);">—</span>';
+
+  const tr = document.createElement('tr');
+  tr.style.animation = 'fadeIn 0.3s ease';
+  tr.innerHTML = `
+    <td style="color:var(--muted);font-family:var(--mono);font-size:0.75rem;">${data.id}</td>
+    <td><span class="tracking-id">${data.tracking_id}</span></td>
+    <td style="color:var(--muted);">${payload.order_id || '—'}</td>
+    <td style="color:var(--muted);">${payload.driver_name || '—'}</td>
+    <td>${badgeHtml}</td>
+    <td style="font-family:var(--mono);font-size:0.78rem;color:var(--muted);">${data.scanned_at}</td>
+    <td style="color:var(--muted);font-size:0.8rem;">${payload.notes || '—'}</td>
+  `;
+  tbody.insertBefore(tr, tbody.firstChild);
+
+  // Keep only 20 rows
+  while (tbody.children.length > 20) tbody.removeChild(tbody.lastChild);
+}
+</script>
+<style>
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>
+{% endblock %}
