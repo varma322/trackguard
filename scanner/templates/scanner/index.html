@@ -40,11 +40,15 @@
       </select>
     </div>
     <div class="form-group" style="margin:0">
-      <label>Notes</label>
-      <select id="notes">
+      <label>Condition</label>
+      <select id="condition">
         <option value="Good condition">Good condition</option>
         <option value="Damage">Damage</option>
       </select>
+    </div>
+    <div class="form-group" style="margin:0; grid-column: span 2;">
+      <label>Notes</label>
+      <input type="text" id="notes" placeholder="Any additional details...">
     </div>
   </div>
 
@@ -74,6 +78,7 @@
         <th>Driver Name</th>
         <th>Courier</th>
         <th>Timestamp (IST)</th>
+        <th>Condition</th>
         <th>Notes</th>
       </tr>
     </thead>
@@ -90,6 +95,7 @@
           {% else %}<span style="color:var(--muted);">—</span>{% endif %}
         </td>
         <td style="font-family:var(--mono);font-size:0.78rem;color:var(--muted);">{{ scan.scanned_at|date:"d M Y, H:i:s" }}</td>
+        <td style="color:var(--muted);font-size:0.8rem;">{{ scan.condition|default:"—" }}</td>
         <td style="color:var(--muted);font-size:0.8rem;">{{ scan.notes|default:"—" }}</td>
       </tr>
       {% empty %}
@@ -125,6 +131,7 @@ async function submitScan() {
     order_id: document.getElementById('order-id').value.trim(),
     driver_name: document.getElementById('driver-name').value.trim(),
     courier: document.getElementById('courier').value,
+    condition: document.getElementById('condition').value,
     notes: document.getElementById('notes').value.trim(),
   };
 
@@ -180,6 +187,7 @@ function addRow(data, payload) {
     <td style="color:var(--muted);">${payload.driver_name || '—'}</td>
     <td>${badgeHtml}</td>
     <td style="font-family:var(--mono);font-size:0.78rem;color:var(--muted);">${data.scanned_at}</td>
+    <td style="color:var(--muted);font-size:0.8rem;">${payload.condition || '—'}</td>
     <td style="color:var(--muted);font-size:0.8rem;">${payload.notes || '—'}</td>
   `;
   tbody.insertBefore(tr, tbody.firstChild);

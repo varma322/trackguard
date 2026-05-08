@@ -36,12 +36,13 @@ def scan(request):
             order_id=data.get('order_id', ''),
             driver_name=data.get('driver_name', ''),
             courier=data.get('courier', ''),
+            condition=data.get('condition', 'Good condition'),
             notes=data.get('notes', ''),
         )
         return JsonResponse({
             'id': pkg.id,
             'tracking_id': pkg.tracking_id,
-            'scanned_at': pkg.scanned_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'scanned_at': timezone.localtime(pkg.scanned_at).strftime('%Y-%m-%d %H:%M:%S'),
             'courier': pkg.get_courier_display(),
         })
     return JsonResponse({'error': 'POST only'}, status=405)
@@ -54,7 +55,7 @@ def records(request):
 
     qs = PackageScan.objects.all()
     if q:
-        qs = qs.filter(Q(tracking_id__icontains=q) | Q(order_id__icontains=q) | Q(driver_name__icontains=q) | Q(notes__icontains=q))
+        qs = qs.filter(Q(tracking_id__icontains=q) | Q(order_id__icontains=q) | Q(driver_name__icontains=q) | Q(condition__icontains=q) | Q(notes__icontains=q))
     if date_from:
         qs = qs.filter(scanned_at__date__gte=date_from)
     if date_to:
@@ -79,10 +80,12 @@ def export_csv(request):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="trackguard_export.csv"'
     writer = csv.writer(response)
-    writer.writerow(['ID', 'Tracking ID', 'Driver Name', 'Order ID', 'Courier', 'Notes', 'Scanned At'])
+    writer.writerow(['ID', 'Tracking ID', 'Driver Name', 'Order ID', 'Courier', 'Condition', 'Notes', 'Scanned At'])
     for s in qs:
-        writer.writerow([s.id, s.tracking_id, s.driver_name, s.order_id, s.get_courier_display(), s.notes,
-                         s.scanned_at.strftime('%Y-%m-%d %H:%M:%S')])
+        local_time = timezone.localtime(s.scanned_at).strftime('%Y-%m-%d %H:%M:%S')
+
+        writer.writerow([s.id, s.tracking_id, s.driver_name, s.order_id, s.get_courier_display(), s.condition, s.notes,
+                         local_time])
     return response
 
 

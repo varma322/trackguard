@@ -2,8 +2,8 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'trackguard-local-secret-key-change-in-prod'
-DEBUG = True
-ALLOWED_HOSTS = ['*']
+DEBUG = False
+ALLOWED_HOSTS = ['orders.mobiuslinq.com']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -57,3 +57,6 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 USE_TZ = True
 TIME_ZONE = 'Asia/Kolkata'
+#static files
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
