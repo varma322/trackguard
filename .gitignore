@@ -231,3 +231,4 @@ __marimo__/
 .streamlit/secrets.toml
 staticfiles/
 scanner/migrations/*
+deployment_plan.md*
