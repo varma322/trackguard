@@ -23,6 +23,15 @@
   </form>
 </div>
 
+<div class="card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+  <form action="{% url 'upload_data' %}" method="POST" enctype="multipart/form-data" style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
+    {% csrf_token %}
+    <input type="file" name="file" accept=".csv, .xlsx, .xls" required style="width: auto; padding: 0.4rem;">
+    <button type="submit" class="btn btn-primary">Upload Data</button>
+  </form>
+  <a href="{% url 'download_template' %}" class="btn btn-ghost" style="font-size:0.8rem;">📄 Download Template</a>
+</div>
+
 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
   <span style="font-size:0.8rem; color:var(--muted);">
     {{ scans.count }} record{{ scans.count|pluralize }} found

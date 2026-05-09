@@ -11,11 +11,14 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 # pyrefly: ignore [missing-import]
 from django.db.models import Q
+from django.contrib import messages
+import pandas as pd
 from .models import PackageScan
 
 
 def index(request):
-    recent = PackageScan.objects.all()[:20]
+    today = timezone.localdate()
+    recent = PackageScan.objects.filter(scanned_at__date=today)[:20]
     return render(request, 'scanner/index.html', {'recent': recent})
 
 
@@ -50,8 +53,9 @@ def scan(request):
 
 def records(request):
     q = request.GET.get('q', '')
-    date_from = request.GET.get('from', '')
-    date_to = request.GET.get('to', '')
+    today_str = timezone.localdate().strftime('%Y-%m-%d')
+    date_from = request.GET.get('from', today_str)
+    date_to = request.GET.get('to', today_str)
 
     qs = PackageScan.objects.all()
     if q:
@@ -66,8 +70,9 @@ def records(request):
 
 def export_csv(request):
     q = request.GET.get('q', '')
-    date_from = request.GET.get('from', '')
-    date_to = request.GET.get('to', '')
+    today_str = timezone.localdate().strftime('%Y-%m-%d')
+    date_from = request.GET.get('from', today_str)
+    date_to = request.GET.get('to', today_str)
 
     qs = PackageScan.objects.all()
     if q:
@@ -92,4 +97,57 @@ def export_csv(request):
 def delete_scan(request, pk):
     if request.method == 'POST':
         PackageScan.objects.filter(pk=pk).delete()
+    return redirect('records')
+
+
+def download_template(request):
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="upload_template.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['Tracking ID', 'Order ID', 'Driver Name', 'Courier', 'Condition', 'Notes'])
+    return response
+
+
+def upload_data(request):
+    if request.method == 'POST' and request.FILES.get('file'):
+        uploaded_file = request.FILES['file']
+        file_name = uploaded_file.name.lower()
+        
+        try:
+            if file_name.endswith('.csv'):
+                df = pd.read_csv(uploaded_file)
+            elif file_name.endswith('.xlsx') or file_name.endswith('.xls'):
+                df = pd.read_excel(uploaded_file)
+            else:
+                messages.error(request, "Unsupported file format. Please upload CSV or Excel.")
+                return redirect('records')
+
+            # Ensure 'Tracking ID' is in columns
+            if 'Tracking ID' not in df.columns:
+                messages.error(request, "Missing 'Tracking ID' column in the uploaded file.")
+                return redirect('records')
+
+            df = df.fillna('')
+            
+            created_count = 0
+            for _, row in df.iterrows():
+                tracking_id = str(row.get('Tracking ID', '')).strip()
+                if not tracking_id:
+                    continue
+
+                PackageScan.objects.create(
+                    tracking_id=tracking_id,
+                    order_id=str(row.get('Order ID', '')).strip(),
+                    driver_name=str(row.get('Driver Name', '')).strip(),
+                    courier=str(row.get('Courier', '')).strip()[:50],
+                    condition=str(row.get('Condition', 'Good condition')).strip()[:50] or 'Good condition',
+                    notes=str(row.get('Notes', '')).strip()[:500]
+                )
+                created_count += 1
+                
+            messages.success(request, f"Successfully imported {created_count} records.")
+            
+        except Exception as e:
+            messages.error(request, f"Error processing file: {str(e)}")
+            
     return redirect('records')
