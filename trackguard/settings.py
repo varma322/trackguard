@@ -60,3 +60,7 @@ TIME_ZONE = 'Asia/Kolkata'
 #static files
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'records'
+LOGOUT_REDIRECT_URL = 'login'
+

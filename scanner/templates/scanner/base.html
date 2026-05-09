@@ -234,10 +234,21 @@
 <body>
 
 <nav>
-  <a href="/" class="nav-brand">▣ TRACKGUARD</a>
-  <a href="/" {% if request.resolver_match.url_name == 'index' %}class="active"{% endif %}>Scanner</a>
-  <a href="/records/" {% if request.resolver_match.url_name == 'records' %}class="active"{% endif %}>Records</a>
-  <a href="/records/?export=1" style="margin-left:auto;" class="btn btn-ghost" onclick="return exportCSV()">⬇ Export CSV</a>
+  <a href="{% if request.user.is_authenticated %}{% url 'records' %}{% else %}/login/{% endif %}" class="nav-brand">▣ TRACKGUARD</a>
+  {% if request.user.is_authenticated %}
+    {% if request.user.is_staff %}
+    <a href="/" {% if request.resolver_match.url_name == 'index' %}class="active"{% endif %}>Scanner</a>
+    {% endif %}
+    <a href="{% url 'records' %}" {% if request.resolver_match.url_name == 'records' %}class="active"{% endif %}>Records</a>
+    
+    <div style="margin-left:auto; display:flex; gap:1rem; align-items:center;">
+      <span style="font-size:0.8rem; color:var(--muted);">{{ request.user.username }}</span>
+      <form method="post" action="{% url 'logout' %}" style="display:inline; margin:0;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger" style="padding:0.4rem 0.8rem; font-size:0.8rem; cursor:pointer;">Logout</button>
+      </form>
+    </div>
+  {% endif %}
 </nav>
 
 <main>

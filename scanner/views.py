@@ -12,17 +12,26 @@ from django.utils import timezone
 # pyrefly: ignore [missing-import]
 from django.db.models import Q
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required, user_passes_test
 import pandas as pd
 from .models import PackageScan
 
 
+def is_admin(user):
+    return user.is_staff
+
+@login_required
 def index(request):
+    if not request.user.is_staff:
+        return redirect('records')
     today = timezone.localdate()
     recent = PackageScan.objects.filter(scanned_at__date=today)[:20]
     return render(request, 'scanner/index.html', {'recent': recent})
 
 
 @csrf_exempt
+@login_required
+@user_passes_test(is_admin)
 def scan(request):
     if request.method == 'POST':
         try:
@@ -51,6 +60,7 @@ def scan(request):
     return JsonResponse({'error': 'POST only'}, status=405)
 
 
+@login_required
 def records(request):
     q = request.GET.get('q', '')
     today_str = timezone.localdate().strftime('%Y-%m-%d')
@@ -68,6 +78,7 @@ def records(request):
     return render(request, 'scanner/records.html', {'scans': qs, 'q': q, 'date_from': date_from, 'date_to': date_to})
 
 
+@login_required
 def export_csv(request):
     q = request.GET.get('q', '')
     today_str = timezone.localdate().strftime('%Y-%m-%d')
@@ -94,12 +105,16 @@ def export_csv(request):
     return response
 
 
+@login_required
+@user_passes_test(is_admin)
 def delete_scan(request, pk):
     if request.method == 'POST':
         PackageScan.objects.filter(pk=pk).delete()
     return redirect('records')
 
 
+@login_required
+@user_passes_test(is_admin)
 def download_template(request):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="upload_template.csv"'
@@ -108,6 +123,8 @@ def download_template(request):
     return response
 
 
+@login_required
+@user_passes_test(is_admin)
 def upload_data(request):
     if request.method == 'POST' and request.FILES.get('file'):
         uploaded_file = request.FILES['file']

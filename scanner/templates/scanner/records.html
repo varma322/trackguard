@@ -23,6 +23,7 @@
   </form>
 </div>
 
+{% if request.user.is_staff %}
 <div class="card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
   <form action="{% url 'upload_data' %}" method="POST" enctype="multipart/form-data" style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
     {% csrf_token %}
@@ -31,6 +32,7 @@
   </form>
   <a href="{% url 'download_template' %}" class="btn btn-ghost" style="font-size:0.8rem;">📄 Download Template</a>
 </div>
+{% endif %}
 
 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
   <span style="font-size:0.8rem; color:var(--muted);">
@@ -73,10 +75,12 @@
         <td style="color:var(--muted);font-size:0.8rem;">{{ scan.condition|default:"—" }}</td>
         <td style="color:var(--muted);font-size:0.8rem;max-width:200px;">{{ scan.notes|default:"—" }}</td>
         <td>
+          {% if request.user.is_staff %}
           <form method="POST" action="/delete/{{ scan.id }}/" onsubmit="return confirm('Delete this record?')">
             {% csrf_token %}
             <button type="submit" class="btn btn-danger">✕</button>
           </form>
+          {% endif %}
         </td>
       </tr>
       {% empty %}
