@@ -1,6 +1,49 @@
 # pyrefly: ignore [missing-import]
 from django.db import models
 
+
+class Order(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('received', 'Received'),
+        ('delivered', 'Delivered'),
+        ('cancelled', 'Cancelled'),
+        ('returned', 'Returned'),
+        ('issue', 'Issue'),
+    ]
+
+    email = models.EmailField(blank=True, default='')
+    order_id = models.CharField(max_length=200, unique=True)
+    product = models.TextField(blank=True, default='')
+    order_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    notes = models.TextField(blank=True, default='')
+    # Populated from Amazon order report import.
+    # TextField so we can store multiple comma-separated tracking IDs
+    # (one order can ship in multiple units with different tracking IDs).
+    amazon_tracking_id = models.TextField(blank=True, default='')
+    amazon_status = models.CharField(max_length=100, blank=True, default='')
+    imported_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-order_date', '-imported_at']
+
+    def __str__(self):
+        return f"{self.order_id} — {self.get_status_display()}"
+
+
+class ImportBatch(models.Model):
+    filename = models.CharField(max_length=255)
+    total_rows = models.IntegerField(default=0)
+    imported_count = models.IntegerField(default=0)
+    skipped_count = models.IntegerField(default=0)
+    imported_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.filename} ({self.imported_count} imported)"
+
+
 class PackageScan(models.Model):
     COURIER_CHOICES = [
         ('', 'Unknown'),
@@ -27,6 +70,11 @@ class PackageScan(models.Model):
     notes = models.CharField(max_length=500, blank=True, default='')
     photo = models.ImageField(upload_to='package_photos/', blank=True, null=True)
     scanned_at = models.DateTimeField(auto_now_add=True)
+    # Link back to Order (ForeignKey so multiple scans can share one order)
+    linked_order = models.ForeignKey(
+        'Order', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='scans'
+    )
 
     class Meta:
         ordering = ['-scanned_at']

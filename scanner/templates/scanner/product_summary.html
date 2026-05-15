@@ -1,0 +1,58 @@
+{% extends 'scanner/base.html' %}
+{% block title %}Products — TrackGuard{% endblock %}
+
+{% block content %}
+<h1>Product Summary</h1>
+<p class="subtitle">Per-product order breakdown by status</p>
+
+<div class="card" style="padding:0; overflow:hidden;">
+  <table>
+    <thead>
+      <tr>
+        <th>Product</th>
+        <th style="text-align:right;">Total</th>
+        <th style="text-align:right; color:#f5c518;">Pending</th>
+        <th style="text-align:right; color:#00aaff;">Received</th>
+        <th style="text-align:right; color:#00c853;">Delivered</th>
+        <th style="text-align:right; color:#ff4444;">Cancelled</th>
+        <th style="text-align:right; color:#ff8c00;">Returned</th>
+        <th style="text-align:right; color:#ff69b4;">Issues</th>
+        <th style="text-align:right;">Progress</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in products %}
+      <tr>
+        <td style="font-size:0.85rem; max-width:280px;">
+          <a href="{% url 'orders_list' %}?q={{ p.product|urlencode }}" style="color:var(--text); text-decoration:none;">
+            {{ p.product|default:"(unknown)" }}
+          </a>
+        </td>
+        <td style="text-align:right; font-family:var(--mono); font-weight:700;">{{ p.total }}</td>
+        <td style="text-align:right; font-family:var(--mono); color:#f5c518;">{{ p.pending }}</td>
+        <td style="text-align:right; font-family:var(--mono); color:#00aaff;">{{ p.received }}</td>
+        <td style="text-align:right; font-family:var(--mono); color:#00c853;">{{ p.delivered }}</td>
+        <td style="text-align:right; font-family:var(--mono); color:#ff4444;">{{ p.cancelled }}</td>
+        <td style="text-align:right; font-family:var(--mono); color:#ff8c00;">{{ p.returned }}</td>
+        <td style="text-align:right; font-family:var(--mono); color:#ff69b4;">{{ p.issue }}</td>
+        <td style="min-width:100px;">
+          {% if p.total %}
+          {% widthratio p.delivered p.total 100 as pct %}
+          <div style="background:var(--surface2); border-radius:4px; height:6px; overflow:hidden;">
+            <div style="background:var(--accent); height:100%; width:{{ pct }}%; transition:width 0.3s;"></div>
+          </div>
+          <div style="font-size:0.7rem; color:var(--muted); margin-top:0.2rem; text-align:right;">{{ pct }}% done</div>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="9" style="text-align:center; color:var(--muted); padding:3rem;">
+          No orders yet. <a href="{% url 'orders_list' %}" style="color:var(--accent);">Import orders →</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

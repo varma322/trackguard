@@ -211,6 +211,13 @@
   .badge-amazon { background: #1a2a1a; color: #00c853; border: 1px solid #1e3a1e; }
   .badge-default { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
 
+  .status-pending   { background: #1a1a0a; color: #f5c518; border: 1px solid #2a2a10; }
+  .status-received  { background: #0a1a2a; color: #00aaff; border: 1px solid #102030; }
+  .status-delivered { background: #0a2a15; color: #00c853; border: 1px solid #103020; }
+  .status-cancelled { background: #2a0a0a; color: #ff4444; border: 1px solid #3a1010; }
+  .status-returned  { background: #2a1a0a; color: #ff8c00; border: 1px solid #3a2010; }
+  .status-issue     { background: #2a0a1a; color: #ff69b4; border: 1px solid #3a1025; }
+
   .toast {
     position: fixed;
     bottom: 2rem; right: 2rem;
@@ -239,7 +246,10 @@
     {% if request.user.is_staff %}
     <a href="/" {% if request.resolver_match.url_name == 'index' %}class="active"{% endif %}>Scanner</a>
     {% endif %}
-    <a href="{% url 'records' %}" {% if request.resolver_match.url_name == 'records' %}class="active"{% endif %}>Records</a>
+    <a href="{% url 'dashboard' %}" {% if request.resolver_match.url_name == 'dashboard' %}class="active"{% endif %}>Dashboard</a>
+    <a href="{% url 'orders_list' %}" {% if request.resolver_match.url_name == 'orders_list' %}class="active"{% endif %}>Orders</a>
+    <a href="{% url 'product_summary' %}" {% if request.resolver_match.url_name == 'product_summary' %}class="active"{% endif %}>Products</a>
+    <a href="{% url 'records' %}" {% if request.resolver_match.url_name == 'records' %}class="active"{% endif %}>Scans</a>
     
     <div style="margin-left:auto; display:flex; gap:1rem; align-items:center;">
       <span style="font-size:0.8rem; color:var(--muted);">{{ request.user.username }}</span>

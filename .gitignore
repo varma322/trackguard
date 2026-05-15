@@ -233,3 +233,6 @@ staticfiles/
 scanner/migrations/*
 deployment_plan.md*
 implementation_plan.md
+settings.py
+.env
+data.json

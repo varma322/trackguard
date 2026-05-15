@@ -65,7 +65,9 @@
 <!-- Live feed -->
 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
   <h2 style="font-family: var(--mono); font-size: 0.9rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase;">Recent Scans</h2>
-  <a href="/records/" style="font-size:0.8rem; color:var(--accent); text-decoration:none;">View all →</a>
+  <div style="display:flex; gap:1rem; align-items:center;">
+    <a href="/records/" style="font-size:0.8rem; color:var(--accent); text-decoration:none;">View all →</a>
+  </div>
 </div>
 
 <div class="card" style="padding:0; overflow:hidden;">
@@ -105,6 +107,7 @@
   </table>
 </div>
 
+
 {% endblock %}
 
 {% block scripts %}
@@ -122,8 +125,18 @@ input.addEventListener('keydown', function(e) {
   }
 });
 
+function showToast(msg, linked) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  t.style.borderColor = linked ? 'var(--accent)' : 'var(--accent2)';
+  document.querySelector('.toast-title').textContent = linked ? '✓ LINKED TO ORDER' : 'SCANNED';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
 async function submitScan() {
   const tracking_id = input.value.trim();
+
   if (!tracking_id) return;
 
   const payload = {
@@ -144,7 +157,14 @@ async function submitScan() {
     const data = await res.json();
 
     if (data.id) {
-      showToast(`${data.tracking_id} — ${data.scanned_at}`);
+      const msg = data.order_linked
+        ? `${data.tracking_id} → ${data.order_linked}${data.auto_detected ? ' (auto-detected)' : ''}`
+        : `${data.tracking_id} — ${data.scanned_at}`;
+      showToast(msg, !!data.order_linked);
+      // If order ID was auto-detected, fill the input field
+      if (data.auto_detected && data.order_id) {
+        document.getElementById('order-id').value = data.order_id;
+      }
       addRow(data, payload);
       input.value = '';
       document.getElementById('notes').value = '';
@@ -195,6 +215,7 @@ function addRow(data, payload) {
   // Keep only 20 rows
   while (tbody.children.length > 20) tbody.removeChild(tbody.lastChild);
 }
+
 </script>
 <style>
 @keyframes fadeIn {

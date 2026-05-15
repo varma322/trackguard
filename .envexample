@@ -1,0 +1,7 @@
+DEBUG=FALSE
+DB_NAME=trackguard_db
+DB_USER=trackguard_user
+DB_PASSWORD=trackguard_password
+SECRET_KEY=[SECRET_KEY]
+ALLOWED_HOSTS=hybk.store,localhost,127.0.0.1
+CSRF_TRUSTED_ORIGINS=https://hybk.store

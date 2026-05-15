@@ -1,0 +1,154 @@
+{% extends 'scanner/base.html' %}
+{% block title %}Dashboard — TrackGuard{% endblock %}
+
+{% block content %}
+<h1>Dashboard</h1>
+<p class="subtitle">Live overview of all Amazon orders</p>
+
+<!-- Summary Cards -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+
+  <a href="{% url 'orders_list' %}" class="card" style="display:block; text-decoration:none; text-align:center; padding: 1.25rem; border-color: var(--border);">
+    <div style="font-family:var(--mono); font-size:2rem; font-weight:700; color:var(--text);">{{ total }}</div>
+    <div style="font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-top:0.25rem;">Total Orders</div>
+  </a>
+
+  <a href="{% url 'orders_list' %}?status=pending" class="card" style="display:block; text-decoration:none; text-align:center; padding: 1.25rem; border-color: #2a2a10;">
+    <div style="font-family:var(--mono); font-size:2rem; font-weight:700; color:#f5c518;">{{ by_status.pending }}</div>
+    <div style="font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-top:0.25rem;">Pending</div>
+  </a>
+
+  <a href="{% url 'orders_list' %}?status=received" class="card" style="display:block; text-decoration:none; text-align:center; padding: 1.25rem; border-color: #102030;">
+    <div style="font-family:var(--mono); font-size:2rem; font-weight:700; color:#00aaff;">{{ by_status.received }}</div>
+    <div style="font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-top:0.25rem;">Received</div>
+  </a>
+
+  <a href="{% url 'orders_list' %}?status=delivered" class="card" style="display:block; text-decoration:none; text-align:center; padding: 1.25rem; border-color: #103020;">
+    <div style="font-family:var(--mono); font-size:2rem; font-weight:700; color:#00c853;">{{ by_status.delivered }}</div>
+    <div style="font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-top:0.25rem;">Delivered</div>
+  </a>
+
+  <a href="{% url 'orders_list' %}?status=cancelled" class="card" style="display:block; text-decoration:none; text-align:center; padding: 1.25rem; border-color: #3a1010;">
+    <div style="font-family:var(--mono); font-size:2rem; font-weight:700; color:#ff4444;">{{ by_status.cancelled }}</div>
+    <div style="font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-top:0.25rem;">Cancelled</div>
+  </a>
+
+  <a href="{% url 'orders_list' %}?status=returned" class="card" style="display:block; text-decoration:none; text-align:center; padding: 1.25rem; border-color: #3a2010;">
+    <div style="font-family:var(--mono); font-size:2rem; font-weight:700; color:#ff8c00;">{{ by_status.returned }}</div>
+    <div style="font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-top:0.25rem;">Returned</div>
+  </a>
+
+  <a href="{% url 'orders_list' %}?status=issue" class="card" style="display:block; text-decoration:none; text-align:center; padding: 1.25rem; border-color: #3a1025;">
+    <div style="font-family:var(--mono); font-size:2rem; font-weight:700; color:#ff69b4;">{{ by_status.issue }}</div>
+    <div style="font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-top:0.25rem;">Issues</div>
+  </a>
+
+  {% if unmatched %}
+  <a href="{% url 'records' %}" class="card" style="display:block; text-decoration:none; text-align:center; padding: 1.25rem; border-color: var(--warn);">
+    <div style="font-family:var(--mono); font-size:2rem; font-weight:700; color:var(--warn);">{{ unmatched }}</div>
+    <div style="font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-top:0.25rem;">Unmatched Scans</div>
+  </a>
+  {% endif %}
+
+  {% if overdue_count %}
+  <a href="{% url 'orders_list' %}?status=pending" class="card" style="display:block; text-decoration:none; text-align:center; padding: 1.25rem; border-color: #ff4444;">
+    <div style="font-family:var(--mono); font-size:2rem; font-weight:700; color:#ff4444;">{{ overdue_count }}</div>
+    <div style="font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-top:0.25rem;">Overdue (7+ days)</div>
+  </a>
+  {% endif %}
+
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+
+  <!-- Product Breakdown -->
+  <div>
+    <h2 style="font-family:var(--mono); font-size:0.85rem; color:var(--muted); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:1rem;">Top Products</h2>
+    <div class="card" style="padding:0; overflow:hidden;">
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th style="text-align:right;">Orders</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in product_stats %}
+          <tr>
+            <td style="font-size:0.8rem; max-width:280px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              {{ p.product|default:"(unknown)" }}
+            </td>
+            <td style="text-align:right; font-family:var(--mono); color:var(--accent);">{{ p.total }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="2" style="text-align:center; color:var(--muted); padding:2rem;">No orders yet</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent Orders -->
+  <div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+      <h2 style="font-family:var(--mono); font-size:0.85rem; color:var(--muted); letter-spacing:0.1em; text-transform:uppercase;">Recent Orders</h2>
+      <a href="{% url 'orders_list' %}" style="font-size:0.8rem; color:var(--accent); text-decoration:none;">View all →</a>
+    </div>
+    <div class="card" style="padding:0; overflow:hidden;">
+      <table>
+        <thead>
+          <tr>
+            <th>Order ID</th>
+            <th>Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for o in recent_orders %}
+          <tr>
+            <td><span class="tracking-id" style="font-size:0.78rem;">{{ o.order_id }}</span></td>
+            <td style="color:var(--muted); font-size:0.8rem;">{{ o.order_date|date:"d M Y"|default:"—" }}</td>
+            <td><span class="badge status-{{ o.status }}">{{ o.get_status_display }}</span></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" style="text-align:center; color:var(--muted); padding:2rem;">No orders yet. <a href="{% url 'orders_list' %}" style="color:var(--accent);">Import orders →</a></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+{% if overdue_orders %}
+<div style="margin-top:1.5rem;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+    <h2 style="font-family:var(--mono); font-size:0.85rem; color:#ff4444; letter-spacing:0.1em; text-transform:uppercase;">⚠ Overdue — Pending 7+ Days</h2>
+    <a href="{% url 'orders_list' %}?status=pending" style="font-size:0.8rem; color:#ff4444; text-decoration:none;">View all pending →</a>
+  </div>
+  <div class="card" style="padding:0; overflow:hidden; border-color:#3a1010;">
+    <table>
+      <thead>
+        <tr>
+          <th>Order ID</th>
+          <th>Product</th>
+          <th>Order Date</th>
+          <th>Days Pending</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in overdue_orders %}
+        <tr>
+          <td><a href="{% url 'order_detail' o.pk %}" style="text-decoration:none;"><span class="tracking-id" style="font-size:0.8rem; color:#ff4444;">{{ o.order_id }}</span></a></td>
+          <td style="font-size:0.8rem; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ o.product }}">{{ o.product|default:"—" }}</td>
+          <td style="font-family:var(--mono); font-size:0.78rem; color:var(--muted);">{{ o.order_date|date:"d M Y" }}</td>
+          <td style="font-family:var(--mono); font-size:0.85rem; color:#ff4444;">{{ o.order_date|timesince }} ago</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

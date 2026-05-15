@@ -38,7 +38,12 @@
   <span style="font-size:0.8rem; color:var(--muted);">
     {{ scans.count }} record{{ scans.count|pluralize }} found
   </span>
-  <a href="/export/?q={{ q }}&from={{ date_from }}&to={{ date_to }}" class="btn btn-ghost" style="font-size:0.8rem;">⬇ Export CSV</a>
+  <div style="display:flex; gap:0.75rem; align-items:center;">
+    {% if request.user.is_staff %}
+    <button onclick="openBulkUpdateModal()" class="btn btn-ghost" style="font-size:0.8rem; color:var(--accent2); border-color:var(--accent2);">🔗 Update Order IDs</button>
+    {% endif %}
+    <a href="/export/?q={{ q }}&from={{ date_from }}&to={{ date_to }}" class="btn btn-ghost" style="font-size:0.8rem;">⬇ Export CSV</a>
+  </div>
 </div>
 
 <div class="card" style="padding:0; overflow:hidden;">
@@ -93,4 +98,36 @@
     </tbody>
   </table>
 </div>
+
+<!-- Bulk Update Order IDs Modal -->
+<div id="bulk-update-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; align-items:center; justify-content:center;">
+  <div class="card" style="width:500px; max-width:95vw; border-color:var(--accent2);">
+    <h2 style="font-family:var(--mono); font-size:1rem; margin-bottom:0.5rem;">Update Order IDs</h2>
+    <p style="font-size:0.8rem; color:var(--muted); margin-bottom:1.5rem;">
+      Paste tracking ID and order ID pairs below. One pair per line, separated by space or tab.
+    </p>
+    <form method="POST" action="{% url 'bulk_update_order_ids' %}">
+      {% csrf_token %}
+      <div class="form-group">
+        <textarea name="data" rows="10" placeholder="369245624649	403-6750656-6321944&#10;369246346571	406-7560486-4484301" required style="font-family:var(--mono); font-size:0.8rem;"></textarea>
+      </div>
+      <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:1.5rem;">
+        <button type="button" class="btn btn-ghost" onclick="closeBulkUpdateModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="background:var(--accent2); color:#fff;">Update Records</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openBulkUpdateModal() {
+  document.getElementById('bulk-update-modal').style.display = 'flex';
+}
+function closeBulkUpdateModal() {
+  document.getElementById('bulk-update-modal').style.display = 'none';
+}
+document.getElementById('bulk-update-modal')?.addEventListener('click', function(e) {
+  if (e.target === this) closeBulkUpdateModal();
+});
+</script>
 {% endblock %}

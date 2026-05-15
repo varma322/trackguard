@@ -1,9 +1,18 @@
+from django.core.files import uploadhandler
+from pathlib import Path
+import os
+from dotenv import load_dotenv 
 from pathlib import Path
 
+
 BASE_DIR = Path(__file__).resolve().parent.parent
-SECRET_KEY = 'trackguard-local-secret-key-change-in-prod'
-DEBUG = True
-ALLOWED_HOSTS = ['orders.mobiuslinq.com', '*', 'localhost', '127.0.0.1']
+load_dotenv(BASE_DIR / '.env')
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+SECRET_KEY = os.getenv('SECRET_KEY')
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', 'http://localhost').split(',')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -45,8 +54,12 @@ WSGI_APPLICATION = 'trackguard.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DB_NAME'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 
@@ -63,4 +76,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'records'
 LOGOUT_REDIRECT_URL = 'login'
+
+# Handle large bulk updates on orders page
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
 

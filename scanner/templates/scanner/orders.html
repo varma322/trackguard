@@ -1,0 +1,404 @@
+{% extends 'scanner/base.html' %}
+{% block title %}Orders — TrackGuard{% endblock %}
+
+{% block content %}
+<h1>Orders</h1>
+<p class="subtitle">All imported Amazon orders — track delivery status</p>
+
+<!-- Import + Actions Bar -->
+{% if request.user.is_staff %}
+<div class="card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+  <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
+    <!-- Regular orders import -->
+    <form id="import-orders-form" action="{% url 'import_orders' %}" method="POST" enctype="multipart/form-data" style="display:flex; gap:0.75rem; align-items:center;">
+      {% csrf_token %}
+      <input type="file" name="file" accept=".csv,.xlsx,.xls" required style="width:auto; padding:0.4rem; font-size:0.85rem;">
+      <button type="submit" class="btn btn-primary">⬆ Import Orders</button>
+    </form>
+    <!-- Amazon report import -->
+    <button onclick="document.getElementById('amazon-import-panel').style.display = document.getElementById('amazon-import-panel').style.display === 'none' ? 'block' : 'none'" class="btn btn-ghost" style="font-size:0.8rem; color:#f5a623; border-color:#f5a623;">
+      📦 Amazon Report
+    </button>
+  </div>
+  <div style="display:flex; gap:0.75rem;">
+    <form action="{% url 'reconcile_orders' %}" method="POST" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-ghost" style="font-size:0.8rem; color:var(--accent); border-color:var(--accent);" title="Match unlinked scans with orders">🔄 Reconcile</button>
+    </form>
+    <a href="{% url 'download_orders_template' %}" class="btn btn-ghost" style="font-size:0.8rem;">📄 Template</a>
+    <a href="{% url 'export_orders_csv' %}?q={{ q }}&status={{ status_filter }}&from={{ date_from }}&to={{ date_to }}" class="btn btn-ghost" style="font-size:0.8rem;">⬇ Export CSV</a>
+  </div>
+</div>
+
+<!-- Amazon Report Import Panel -->
+<div id="amazon-import-panel" style="display:none;">
+  <div class="card" style="border-color:#f5a623; background: linear-gradient(135deg, #1a1200 0%, var(--surface) 100%);">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1rem;">
+      <div>
+        <h3 style="font-family:var(--mono); font-size:0.9rem; color:#f5a623; margin-bottom:0.4rem;">📦 Amazon Order Report Import</h3>
+        <p style="font-size:0.8rem; color:var(--muted); max-width:560px;">
+          Upload your Amazon order history report to auto-update statuses and store tracking IDs.
+          Download from <strong style="color:var(--text);">Amazon → Orders → Order History Reports</strong>.
+          Supports: Order Status, Tracking Number columns.
+        </p>
+      </div>
+      <a href="{% url 'download_amazon_report_template' %}" class="btn btn-ghost" style="font-size:0.75rem; white-space:nowrap;">📄 Sample Format</a>
+    </div>
+    <form id="amazon-import-form" action="{% url 'batch_status_import' %}" method="POST" enctype="multipart/form-data" style="display:flex; gap:0.75rem; align-items:center;">
+      {% csrf_token %}
+      <input type="file" name="file" accept=".csv,.xlsx,.xls" required style="width:auto; padding:0.4rem; font-size:0.85rem;">
+      <button type="submit" class="btn btn-primary" style="background:#f5a623; white-space:nowrap;">⚡ Import & Update Statuses</button>
+    </form>
+    <div style="margin-top:1rem; font-size:0.75rem; color:var(--muted);">
+      <strong style="color:var(--text);">What this does:</strong>
+      Shipped → Received · Delivered → Delivered · Cancelled → Cancelled · Stores tracking IDs for auto-scan detection
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Search & Filter -->
+<div class="card">
+  <form method="GET" style="display:grid; grid-template-columns: 1fr auto auto auto auto; gap:0.75rem; align-items:end;">
+    <div class="form-group" style="margin:0">
+      <label>Search</label>
+      <input type="text" name="q" value="{{ q }}" placeholder="Order ID, email, product...">
+    </div>
+    <div class="form-group" style="margin:0">
+      <label>Status</label>
+      <select name="status" style="width:auto;">
+        <option value="">All Statuses</option>
+        {% for val, label in status_choices %}
+        <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group" style="margin:0">
+      <label>From</label>
+      <input type="date" name="from" value="{{ date_from }}" style="width:auto;">
+    </div>
+    <div class="form-group" style="margin:0">
+      <label>To</label>
+      <input type="date" name="to" value="{{ date_to }}" style="width:auto;">
+    </div>
+    <button type="submit" class="btn btn-primary">Search</button>
+  </form>
+</div>
+
+<!-- Bulk Actions -->
+{% if request.user.is_staff %}
+<form method="POST" action="{% url 'bulk_update_status' %}" id="bulk-form">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+      <span style="font-size:0.8rem; color:var(--muted);">{{ total }} order{{ total|pluralize }} found</span>
+      <span id="selected-count" style="font-size:0.8rem; color:var(--accent); display:none;"></span>
+    </div>
+    <div style="display:flex; gap:0.75rem; align-items:center;" id="bulk-actions" style="display:none;">
+      <select name="bulk_status" style="width:auto; padding:0.5rem 0.8rem; font-size:0.8rem;">
+        <option value="">— Bulk Update Status —</option>
+        {% for val, label in status_choices %}
+        <option value="{{ val }}">→ {{ label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-ghost" style="font-size:0.8rem;" onclick="return confirmBulk()">Apply to Selected</button>
+      <button type="button" class="btn btn-ghost" style="font-size:0.8rem; color:var(--muted);" onclick="clearSelection()">Clear</button>
+    </div>
+  </div>
+
+  <!-- Orders Table -->
+  <div class="card" style="padding:0; overflow:hidden;">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px;"><input type="checkbox" id="select-all" title="Select all" style="width:auto; cursor:pointer;"></th>
+          <th>Order ID</th>
+          <th>Email</th>
+          <th>Product</th>
+          <th>Order Date</th>
+          <th>Status</th>
+          <th>Tracking ID</th>
+          <th>Scanned At</th>
+          <th>Notes</th>
+          {% if request.user.is_staff %}<th></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders %}
+        <tr id="row-{{ order.pk }}">
+          <td><input type="checkbox" name="selected_orders" value="{{ order.pk }}" class="order-checkbox" style="width:auto; cursor:pointer;"></td>
+          <td><a href="{% url 'order_detail' order.pk %}" style="text-decoration:none;"><span class="tracking-id" style="font-size:0.8rem;">{{ order.order_id }}</span></a></td>
+          <td style="color:var(--muted); font-size:0.8rem; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ order.email|default:"—" }}</td>
+          <td style="font-size:0.8rem; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ order.product }}">{{ order.product|default:"—" }}</td>
+          <td style="font-family:var(--mono); font-size:0.78rem; color:var(--muted);">{{ order.order_date|date:"d M Y"|default:"—" }}</td>
+          <td>
+            <span class="badge status-{{ order.status }}">{{ order.get_status_display }}</span>
+          </td>
+          <td style="font-family:var(--mono); font-size:0.72rem;">
+            {% with scans=order.scans.all %}
+              {% if scans %}
+                {% for s in scans %}
+                  <div style="color:var(--accent); white-space:nowrap;">{{ s.tracking_id }}</div>
+                {% endfor %}
+              {% elif order.amazon_tracking_id %}
+                <span style="color:var(--muted);">{{ order.amazon_tracking_id }}</span>
+              {% else %}—{% endif %}
+            {% endwith %}
+          </td>
+          <td style="font-family:var(--mono); font-size:0.75rem; color:var(--muted);">
+            {% with scans=order.scans.all %}
+              {% if scans %}
+                <span style="color:var(--accent);">{{ scans.0.scanned_at|date:"d M, H:i" }}</span>
+                {% if scans|length > 1 %}<span style="font-size:0.7rem;"> +{{ scans|length|add:"-1" }} more</span>{% endif %}
+              {% else %}—{% endif %}
+            {% endwith %}
+          </td>
+          <td style="color:var(--muted); font-size:0.78rem; max-width:160px;">{{ order.notes|default:"—" }}</td>
+          {% if request.user.is_staff %}
+          <td>
+            <button type="button" class="btn btn-ghost" style="font-size:0.75rem; padding:0.3rem 0.6rem;"
+              onclick="openStatusModal({{ order.pk }}, '{{ order.order_id }}', '{{ order.status }}', '{{ order.notes|escapejs }}')">
+              Edit
+            </button>
+          </td>
+          {% endif %}
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" style="text-align:center; color:var(--muted); padding:3rem;">
+            No orders found{% if q %} for "{{ q }}"{% endif %}.
+            {% if not q and not status_filter %}
+            <br><br><span style="font-size:0.85rem;">Import your Amazon orders Excel file above to get started.</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</form>
+{% else %}
+<!-- Read-only table for non-staff -->
+<div class="card" style="padding:0; overflow:hidden;">
+  <table>
+    <thead>
+      <tr>
+        <th>Order ID</th>
+        <th>Email</th>
+        <th>Product</th>
+        <th>Order Date</th>
+        <th>Status</th>
+        <th>Scanned At</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for order in orders %}
+      <tr>
+        <td><span class="tracking-id" style="font-size:0.8rem;">{{ order.order_id }}</span></td>
+        <td style="color:var(--muted); font-size:0.8rem;">{{ order.email|default:"—" }}</td>
+        <td style="font-size:0.8rem; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ order.product|default:"—" }}</td>
+        <td style="font-family:var(--mono); font-size:0.78rem; color:var(--muted);">{{ order.order_date|date:"d M Y"|default:"—" }}</td>
+        <td><span class="badge status-{{ order.status }}">{{ order.get_status_display }}</span></td>
+        <td style="font-family:var(--mono); font-size:0.75rem; color:var(--muted);">
+          {% if order.scan %}<span style="color:var(--accent);">{{ order.scan.scanned_at|date:"d M, H:i" }}</span>{% else %}—{% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" style="text-align:center; color:var(--muted); padding:3rem;">No orders found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- Pagination -->
+{% if page_obj.has_other_pages %}
+<div style="display:flex; justify-content:center; align-items:center; gap:0.5rem; margin: 1.5rem 0; flex-wrap:wrap;">
+  {% if page_obj.has_previous %}
+    <a href="?page=1&q={{ q }}&status={{ status_filter }}&from={{ date_from }}&to={{ date_to }}" class="btn btn-ghost" style="font-size:0.8rem; padding:0.4rem 0.8rem;">« First</a>
+    <a href="?page={{ page_obj.previous_page_number }}&q={{ q }}&status={{ status_filter }}&from={{ date_from }}&to={{ date_to }}" class="btn btn-ghost" style="font-size:0.8rem; padding:0.4rem 0.8rem;">‹ Prev</a>
+  {% endif %}
+
+  <span style="font-family:var(--mono); font-size:0.8rem; color:var(--muted); padding:0.4rem 1rem; background:var(--surface2); border-radius:8px; border:1px solid var(--border);">
+    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} &nbsp;·&nbsp; {{ total }} total
+  </span>
+
+  {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&q={{ q }}&status={{ status_filter }}&from={{ date_from }}&to={{ date_to }}" class="btn btn-ghost" style="font-size:0.8rem; padding:0.4rem 0.8rem;">Next ›</a>
+    <a href="?page={{ page_obj.paginator.num_pages }}&q={{ q }}&status={{ status_filter }}&from={{ date_from }}&to={{ date_to }}" class="btn btn-ghost" style="font-size:0.8rem; padding:0.4rem 0.8rem;">Last »</a>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Status Edit Modal -->
+<div id="status-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; align-items:center; justify-content:center;">
+  <div class="card" style="width:420px; max-width:95vw; border-color:var(--accent);">
+    <h2 style="font-family:var(--mono); font-size:1rem; margin-bottom:0.25rem;">Update Order Status</h2>
+    <p id="modal-order-id" style="font-family:var(--mono); font-size:0.8rem; color:var(--muted); margin-bottom:1.5rem;"></p>
+    <form method="POST" id="modal-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <div class="form-group">
+        <label>Status</label>
+        <select name="status" id="modal-status">
+          {% for val, label in status_choices %}
+          <option value="{{ val }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <input type="text" name="notes" id="modal-notes" placeholder="Optional note...">
+      </div>
+      <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:1.5rem;">
+        <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="upload-overlay" style="
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 1.5rem;
+">
+  <div style="
+    width: 64px; height: 64px;
+    border: 4px solid rgba(255,255,255,0.12);
+    border-top-color: var(--accent, #00c8ff);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  "></div>
+  <div style="text-align:center;">
+    <div id="overlay-title" style="font-family:var(--mono,'Space Mono',monospace); font-size:1rem; color:#fff; margin-bottom:0.4rem;">Uploading file…</div>
+    <div style="font-size:0.78rem; color:rgba(255,255,255,0.5);">Please wait — do not close or switch tabs</div>
+  </div>
+</div>
+
+<style>
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Select all / individual checkboxes ──────────────────────────────────────
+const selectAll = document.getElementById('select-all');
+const bulkActions = document.getElementById('bulk-actions');
+const selectedCount = document.getElementById('selected-count');
+
+if (selectAll) {
+  selectAll.addEventListener('change', function() {
+    document.querySelectorAll('.order-checkbox').forEach(cb => cb.checked = this.checked);
+    updateBulkUI();
+  });
+  document.querySelectorAll('.order-checkbox').forEach(cb => {
+    cb.addEventListener('change', updateBulkUI);
+  });
+}
+
+function updateBulkUI() {
+  const checked = document.querySelectorAll('.order-checkbox:checked').length;
+  if (checked > 0) {
+    bulkActions.style.display = 'flex';
+    selectedCount.style.display = 'inline';
+    selectedCount.textContent = `${checked} selected`;
+  } else {
+    bulkActions.style.display = 'none';
+    selectedCount.style.display = 'none';
+  }
+}
+
+function clearSelection() {
+  document.querySelectorAll('.order-checkbox').forEach(cb => cb.checked = false);
+  if (selectAll) selectAll.checked = false;
+  updateBulkUI();
+}
+
+function confirmBulk() {
+  const status = document.querySelector('[name=bulk_status]').value;
+  const count = document.querySelectorAll('.order-checkbox:checked').length;
+  if (!status) { alert('Please select a status to apply.'); return false; }
+  return confirm(`Update ${count} order(s) to "${status}"?`);
+}
+
+// ── Status edit modal ────────────────────────────────────────────────────────
+function openStatusModal(pk, orderId, currentStatus, currentNotes) {
+  document.getElementById('modal-order-id').textContent = orderId;
+  document.getElementById('modal-status').value = currentStatus;
+  document.getElementById('modal-notes').value = currentNotes;
+  document.getElementById('modal-form').action = `/orders/${pk}/status/`;
+  const modal = document.getElementById('status-modal');
+  modal.style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('status-modal').style.display = 'none';
+}
+
+document.getElementById('status-modal')?.addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// ── Upload / Import loading overlay ─────────────────────────────────────────
+(function () {
+  const overlay = document.getElementById('upload-overlay');
+  const overlayTitle = document.getElementById('overlay-title');
+  let uploading = false;
+
+  function showOverlay(label) {
+    overlayTitle.textContent = label || 'Uploading file…';
+    overlay.style.display = 'flex';
+    uploading = true;
+  }
+
+  function hideOverlay() {
+    overlay.style.display = 'none';
+    uploading = false;
+  }
+
+  // Hook both import forms
+  const forms = [
+    { id: 'import-orders-form',  label: 'Importing orders…' },
+    { id: 'amazon-import-form',  label: 'Importing Amazon report…' },
+  ];
+
+  forms.forEach(({ id, label }) => {
+    const form = document.getElementById(id);
+    if (!form) return;
+    form.addEventListener('submit', function (e) {
+      const fileInput = form.querySelector('input[type="file"]');
+      if (fileInput && !fileInput.files.length) return; // let browser handle required
+      showOverlay(label);
+    });
+  });
+
+  // Warn user if they try to navigate away during upload
+  window.addEventListener('beforeunload', function (e) {
+    if (!uploading) return;
+    const msg = 'File upload is in progress. If you leave, the import will be cancelled.';
+    e.preventDefault();
+    e.returnValue = msg;
+    return msg;
+  });
+
+  // Hide overlay once page is fully loaded (i.e. after server redirect back)
+  window.addEventListener('pageshow', hideOverlay);
+})();
+</script>
+{% endblock %}
